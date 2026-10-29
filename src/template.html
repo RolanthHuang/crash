@@ -1,0 +1,1338 @@
+<title>Crash 殺率試玩台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wdth,wght@75..112.5,300..800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+:root{
+  /* Layout: launch console — night-sky viewport + control deck on the left, telemetry column on the right; stacks below 1020px */
+  --bg:#E6EAF0; --panel:#F6F8FB; --panel-2:#EDF1F6; --ink:#121E36; --muted:#56647C; --line:#C9D1DD;
+  --accent:#D9520C; --on-accent:#FFFFFF; --on-win:#FFFFFF;
+  --win:#167F55; --loss:#C2352E; --kill:#3446B5; --spike:#A97C0C; --rtp:#3760D2; --base:#BF2541;
+  /* the sky viewport is always night, in both themes */
+  --scr-1:#081430; --scr-2:#152A51; --scr-3:#2D2B4B; --scr-ink:#F1F4FB; --scr-dim:rgba(196,210,250,.62);
+  --scr-hot:#FFB547; --scr-gold:#FFD84A; --scr-bust:#FF5A4E; --scr-win:#55E3A0; --scr-kill:#A9B8FF;
+  --mono:"Martian Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --body:"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C121E; --panel:#131B2A; --panel-2:#192233; --ink:#E4E9F2; --muted:#93A1B8; --line:#273247;
+    --accent:#FF7A2E; --on-accent:#1A0C02; --on-win:#04200F;
+    --win:#3BC688; --loss:#FF6459; --kill:#8EA0FF; --spike:#E9B53B; --rtp:#7D9BFF; --base:#FF7088;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C121E; --panel:#131B2A; --panel-2:#192233; --ink:#E4E9F2; --muted:#93A1B8; --line:#273247;
+  --accent:#FF7A2E; --on-accent:#1A0C02; --on-win:#04200F;
+  --win:#3BC688; --loss:#FF6459; --kill:#8EA0FF; --spike:#E9B53B; --rtp:#7D9BFF; --base:#FF7088;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1320px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:flex;flex-direction:column;gap:16px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px}
+.brand h1{margin:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;font-size:clamp(22px,3vw,30px);line-height:1.15;font-weight:900;text-wrap:balance}
+.brand .mark{font-family:var(--mono);font-weight:800;font-stretch:76%;letter-spacing:.03em;color:var(--accent)}
+.brand .sub{margin:4px 0 0;color:var(--muted);font-size:13px}
+.brand .sub a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.brand .sub a:hover{color:var(--ink)}
+.views{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.views a{padding:8px 14px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.views a:hover{color:var(--ink)}
+.views a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+
+/* session pads */
+.pads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pad{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;text-align:left;min-width:0}
+.pad-name{font-weight:700;font-size:15px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.pad-name .nm{white-space:nowrap}
+@media (max-width:520px){.pad{padding:8px 10px}.pad-name{font-size:14px}.pad-sub{font-size:10.5px}}
+.pad-sub{font-family:var(--mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pad[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.pad:disabled{opacity:.6}
+.tag{font:700 10px/1 var(--mono);padding:4px 6px;border-radius:5px;letter-spacing:.06em}
+.tag.on{background:var(--kill);color:var(--panel)}
+.tag.off{background:var(--panel-2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+
+/* console */
+.console{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"flight tele" "log tele";gap:14px 18px;align-items:start}
+@media (max-width:1020px){.console{grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-template-areas:"flight" "tele" "log"}}
+.flight{grid-area:flight;display:flex;flex-direction:column;gap:10px;min-width:0}
+.telemetry{grid-area:tele}
+.logcard{grid-area:log}
+.logcard .table-scroll{max-height:380px}
+.sky{position:relative;height:clamp(260px,44vw,460px);border-radius:14px;overflow:hidden;background:var(--scr-1);isolation:isolate}
+.sky canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;top:12px;display:flex;gap:14px;font:500 11px/1.2 var(--mono);color:var(--scr-dim);letter-spacing:.04em;font-variant-numeric:tabular-nums;pointer-events:none}
+.hud-l{left:14px}
+.hud-r{right:14px;color:var(--scr-kill)}
+.readout{position:absolute;left:12px;right:12px;top:50%;transform:translateY(-62%);text-align:center;pointer-events:none}
+.mult{font-family:var(--mono);font-weight:800;font-stretch:82%;font-size:clamp(46px,8.6vw,94px);line-height:1;color:var(--scr-ink);letter-spacing:-.01em;font-variant-numeric:tabular-nums;text-shadow:0 2px 32px rgba(255,140,60,.30)}
+.mult[data-state="warm"]{color:var(--scr-hot)}
+.mult[data-state="gold"]{color:var(--scr-gold)}
+.mult[data-state="bust"]{color:var(--scr-bust);text-shadow:0 2px 32px rgba(255,80,60,.4)}
+.readsub{margin-top:10px;font-size:14px;line-height:1.5;color:var(--scr-dim);font-weight:500;text-wrap:balance}
+.readsub .pos{color:var(--scr-win);font-family:var(--mono)}
+.readsub .neg{color:var(--scr-bust);font-family:var(--mono)}
+.readsub .kill{color:var(--scr-kill)}
+
+.tape{display:flex;gap:6px;overflow-x:auto;min-height:30px;padding-bottom:2px;scrollbar-width:thin}
+.tp{flex:none;font:600 11.5px/1 var(--mono);padding:7px 9px;border-radius:999px;background:var(--panel);color:var(--muted);font-variant-numeric:tabular-nums;border:1px solid var(--line)}
+.tp.lo{color:var(--loss)} .tp.mid{color:var(--ink)} .tp.hi{color:var(--win)} .tp.top{color:var(--spike)}
+.tp.forced{border-color:var(--kill);box-shadow:inset 0 0 0 1px var(--kill)}
+.tape .empty{color:var(--muted);font-size:13px;align-self:center}
+
+/* control deck */
+.deck{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.95fr) auto;grid-template-areas:"stake cash go" "opts opts opts";gap:14px 20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stake{grid-area:stake}.cash{grid-area:cash}.go{grid-area:go}
+.opts{grid-area:opts;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;border-top:1px dashed var(--line);padding-top:12px}
+@media (max-width:760px){.deck{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"go go" "stake cash" "opts opts"}}
+@media (max-width:480px){.deck{grid-template-columns:minmax(0,1fr);grid-template-areas:"go" "stake" "cash" "opts"}}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>label,.lbl{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.02em}
+input[type=number],select{height:40px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums;min-width:0}
+select{font-family:var(--body)}
+input:disabled{opacity:.55}
+.stake-row{display:flex;gap:6px}
+.stake-row input{flex:1;width:100%;text-align:center}
+.step{flex:none;width:40px;height:40px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);font-size:18px;line-height:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{height:30px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:transparent;font:600 12px var(--mono)}
+.chips button:hover,.step:hover{border-color:var(--ink)}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--accent)}
+.cash-row{display:flex;align-items:center;gap:6px}
+.cash-row input{width:120px}
+.unit{font-family:var(--mono);color:var(--muted);font-size:13px}
+.hint{margin:0;font-size:12px;color:var(--muted)}
+.go{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.go-btn{min-height:70px;min-width:210px;width:100%;padding:6px 22px;border:0;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:900;font-size:21px;letter-spacing:.06em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:transform .08s ease, background-color .15s ease}
+.go-btn small{font:500 12px/1.2 var(--mono);opacity:.9;letter-spacing:0;font-variant-numeric:tabular-nums}
+.go-btn:active:not(:disabled){transform:translateY(1px)}
+.go-btn.cash{background:var(--win);color:var(--on-win)}
+.go-btn:disabled{background:var(--panel-2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+.skip-btn{height:32px;border:1px solid var(--line);background:transparent;border-radius:8px;font-size:13px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel-2)}
+.seg button{height:34px;padding:0 12px;border:0;background:transparent;font:600 12.5px var(--mono);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.auto-row{display:flex;align-items:center;gap:6px}
+.auto-row input{width:86px;height:34px}
+.ghost{height:34px;padding:0 14px;border:1px solid var(--ink);border-radius:8px;background:transparent;font-weight:700;font-size:13px;white-space:nowrap}
+.ghost.on{background:var(--ink);color:var(--bg)}
+.switch{display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px;cursor:pointer;height:34px;position:relative}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch .track{width:40px;height:22px;border-radius:999px;background:var(--line);position:relative;transition:background-color .15s}
+.switch .track::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--panel);transition:transform .15s}
+.switch input:checked+.track{background:var(--kill)}
+.switch input:checked+.track::after{transform:translateX(18px)}
+.switch input:focus-visible+.track{outline:2px solid var(--accent);outline-offset:2px}
+.switch input:disabled+.track{opacity:.45}
+.switch .why{font-weight:500;font-size:12px;color:var(--muted)}
+
+/* telemetry */
+.telemetry{display:flex;flex-direction:column;gap:12px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .k{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.kpi .v{font:700 23px/1.2 var(--mono);font-stretch:86%;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .s{font:11px/1.4 var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v.pos{color:var(--win)} .v.neg{color:var(--loss)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
+.card-h h2,.card-h h3{margin:0;font-size:14px;font-weight:700}
+.legend{display:flex;gap:4px 12px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.legend i.dot{width:7px;height:7px;border-radius:50%}
+canvas.chart{width:100%;display:block}
+.tiny{height:26px;padding:0 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--muted);white-space:nowrap}
+.tiny:hover:not(:disabled){color:var(--ink);border-color:var(--ink)}
+.tiny.warn{border-color:var(--loss);color:var(--loss)}
+
+.house{background:var(--panel-2)}
+.hrows{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;margin:0;font-size:13px}
+.hrows dt{color:var(--muted);white-space:nowrap}
+.hrows dd{margin:0;min-width:0}
+.num{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+.state{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700;margin-left:6px}
+.state.hot{background:color-mix(in srgb, var(--loss) 16%, transparent);color:var(--loss)}
+.state.cold{background:color-mix(in srgb, var(--rtp) 15%, transparent);color:var(--rtp)}
+.lastcall{margin:0;font-size:13px;border-top:1px dashed var(--line);padding-top:8px}
+.lastcall b{font-family:var(--mono);font-size:12.5px;color:var(--kill)}
+
+.blind p{margin:0;font-size:13.5px}
+.blind .row{display:flex;gap:8px;flex-wrap:wrap}
+.blind button{height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);font-weight:700;font-size:13px}
+.blind button:hover{border-color:var(--ink)}
+
+.table-scroll{overflow:auto;max-height:310px;border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;background:var(--panel);color:var(--muted);font-weight:500;font-size:11.5px;z-index:1}
+td{font-family:var(--mono);font-size:12px}
+td.empty{text-align:center;color:var(--muted);font-family:var(--body);padding:18px 8px}
+tr.forced td{background:color-mix(in srgb, var(--kill) 10%, transparent)}
+td.pos,span.pos{color:var(--win)} td.neg,span.neg{color:var(--loss)}
+td .kd{color:var(--kill);font-weight:700}
+td .sp{color:var(--spike);font-weight:700}
+
+/* bulk */
+.prose{max-width:74ch}
+.prose h2{font-size:22px;line-height:1.25;margin:0 0 6px;text-wrap:balance}
+.prose p{margin:0}
+.bulk-form{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.bulk-form input{width:118px}
+.bulk-form select{min-width:min(280px,100%)}
+.run-btn{height:40px;padding:0 20px;border:0;border-radius:9px;background:var(--accent);color:var(--on-accent);font-weight:900;letter-spacing:.04em}
+.run-btn:disabled{background:var(--panel-2);color:var(--muted)}
+.progress{height:6px;background:var(--panel-2);border-radius:999px;overflow:hidden}
+.progress span{display:block;height:100%;width:0;background:var(--accent);transition:width .1s linear}
+.verdict{font-size:16px;margin:0;max-width:80ch;text-wrap:pretty}
+.verdict b{font-family:var(--mono);font-size:15px}
+.bulk-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.bulk-grid{grid-template-columns:minmax(0,1fr)}}
+.metrics td:first-child,.metrics th:first-child{text-align:left;font-family:var(--body);font-size:13px;white-space:normal}
+.metrics td.d{font-weight:700}
+.cap{margin:0;font-size:12px;color:var(--muted)}
+.sample-nav{display:flex;align-items:center;gap:8px;font:12px var(--mono);color:var(--muted)}
+
+/* rules */
+.rules{display:flex;flex-direction:column;gap:8px;max-width:78ch}
+.rules h2{font-size:24px;margin:0}
+.rules h3{font-size:16px;margin:16px 0 2px}
+.rules p,.rules li{margin:0;max-width:72ch}
+.rules ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.rules pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;font:12.5px/1.65 var(--mono);margin:2px 0}
+.rules .table-scroll{max-height:none;max-width:680px}
+.rules code{font-family:var(--mono);font-size:.88em;background:var(--panel-2);padding:1px 5px;border-radius:5px}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom, 0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;max-width:calc(100% - 32px);box-shadow:0 8px 28px rgba(0,0,0,.28)}
+@media (prefers-reduced-motion: reduce){*{transition:none !important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1><span class="mark">CRASH</span><span>殺率試玩台</span></h1>
+      <p class="sub">crashsimulation.py 逐行移植 · 同一顆引擎，無殺率／有殺率／盲測三個獨立 session · <a href="https://github.com/RolanthHuang/crash" target="_blank" rel="noopener">原始碼</a></p>
+    </div>
+    <nav class="views" aria-label="頁面">
+      <a href="#play" data-view="play">試玩</a>
+      <a href="#bulk" data-view="bulk">批量模擬</a>
+      <a href="#rules" data-view="rules">規則與原碼</a>
+    </nav>
+  </header>
+
+  <section id="view-play">
+    <div class="wrap-inner" style="display:flex;flex-direction:column;gap:14px">
+      <div class="pads" role="tablist" aria-label="選擇 session">
+        <button class="pad" id="pad-off" data-mode="off" role="tab"><span class="pad-name"><span class="nm">無殺率</span><span class="tag off">OFF</span></span><span class="pad-sub" id="padsub-off">還沒飛</span></button>
+        <button class="pad" id="pad-on" data-mode="on" role="tab"><span class="pad-name"><span class="nm">有殺率</span><span class="tag on">ON</span></span><span class="pad-sub" id="padsub-on">還沒飛</span></button>
+        <button class="pad" id="pad-blind" data-mode="blind" role="tab"><span class="pad-name"><span class="nm">盲測</span><span class="tag off" id="blindTag">?</span></span><span class="pad-sub" id="padsub-blind">還沒飛</span></button>
+      </div>
+
+      <div class="console">
+        <div class="flight">
+          <div class="sky" id="skyBox">
+            <canvas id="sky" aria-label="火箭飛行畫面"></canvas>
+            <div class="hud hud-l"><span id="hudFlt">FLT 001</span><span id="hudT">T+0.0s</span><span id="hudMode">無殺率</span></div>
+            <div class="hud hud-r" id="hudHouse" hidden></div>
+            <div class="readout" aria-live="polite"><div class="mult" id="mult" data-state="idle">1.00×</div><div class="readsub" id="readSub">按「起飛」或空白鍵開始</div></div>
+          </div>
+          <div class="tape" id="tape" aria-label="最近爆點"></div>
+
+          <div class="deck">
+            <div class="field stake">
+              <label for="bet">下注</label>
+              <div class="stake-row">
+                <button class="step" id="betMinus" type="button" aria-label="減少注額">−</button>
+                <input id="bet" type="number" inputmode="numeric" min="1" step="1" value="10">
+                <button class="step" id="betPlus" type="button" aria-label="增加注額">+</button>
+              </div>
+              <div class="chips" id="chips">
+                <button type="button" data-chip="half">½</button>
+                <button type="button" data-chip="double">2×</button>
+                <button type="button" data-chip="10">10</button>
+                <button type="button" data-chip="50">50</button>
+                <button type="button" data-chip="100">100</button>
+              </div>
+            </div>
+            <div class="field cash">
+              <label class="check" for="autoOn"><input type="checkbox" id="autoOn"> 自動收手</label>
+              <div class="cash-row"><input id="autoT" type="number" inputmode="decimal" min="1.01" max="360" step="0.01" value="2.00" aria-label="自動收手倍數"><span class="unit">×</span></div>
+              <p class="hint" id="cashHint">不勾就自己按「收手」</p>
+            </div>
+            <div class="go">
+              <button class="go-btn" id="goBtn" type="button">起飛<small>下注 10</small></button>
+              <button class="skip-btn" id="skipBtn" type="button" hidden>快轉到結果</button>
+            </div>
+            <div class="opts">
+              <div class="field">
+                <span class="lbl">飛行速度</span>
+                <div class="seg" id="speedSeg">
+                  <button type="button" data-speed="1" aria-pressed="true">1×</button>
+                  <button type="button" data-speed="2" aria-pressed="false">2×</button>
+                  <button type="button" data-speed="4" aria-pressed="false">4×</button>
+                  <button type="button" data-speed="0" aria-pressed="false" title="不播動畫，直接結算">瞬間</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="autoN">自動連玩</label>
+                <div class="auto-row"><input id="autoN" type="number" inputmode="numeric" min="1" max="100000" value="50"><span class="unit">局</span><button id="autoBtn" class="ghost" type="button">開始</button></div>
+              </div>
+              <div class="field">
+                <span class="lbl">設計者用</span>
+                <label class="switch" for="houseOn"><input type="checkbox" id="houseOn"><span class="track"></span>後台視角<span class="why" id="houseWhy"></span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="telemetry" aria-label="本 session 數據">
+          <div class="kpis">
+            <div class="kpi"><span class="k">餘額 <button id="refillBtn" class="tiny" type="button" hidden>補 1,000</button></span><span class="v" id="kBal">1,000</span><span class="s" id="kBalSub">起始 1,000</span></div>
+            <div class="kpi"><span class="k">本 session RTP</span><span class="v" id="kRtp">—</span><span class="s" id="kRtpSub">還沒下注</span></div>
+            <div class="kpi"><span class="k">局數</span><span class="v" id="kN">0</span><span class="s" id="kNSub">收手成功率 —</span></div>
+            <div class="kpi"><span class="k">淨輸贏</span><span class="v" id="kNet">0</span><span class="s" id="kNetSub">不含補充籌碼</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>累計 RTP</h2><span class="legend" id="traceLegend"></span></div>
+            <canvas class="chart" id="rtpChart"></canvas>
+          </div>
+          <div class="card house" id="house" hidden></div>
+          <div class="card blind" id="blindBox" hidden></div>
+        </aside>
+
+        <div class="card logcard">
+          <div class="card-h"><h2>飛行紀錄</h2><button class="tiny" id="resetBtn" type="button">重置這個 session</button></div>
+          <div class="table-scroll"><table id="ledger"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-bulk" hidden>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="prose">
+        <h2>批量模擬：同一組亂數，有殺率 vs 無殺率</h2>
+        <p>沿用原碼的機器人玩家：注額 1，每局約 1/11 機率加注成 3、5、9、17 或 21。兩種模式吃同一條注額、爆點與收手亂數，差別只剩殺率控制本身。每場從 RTP 0 開始，p 跟原碼一樣會帶到下一場。</p>
+      </div>
+      <form class="bulk-form" id="bulkForm">
+        <div class="field"><label for="bSessions">場次</label><input id="bSessions" type="number" min="100" max="50000" step="100" value="2000"></div>
+        <div class="field"><label for="bRounds">每場局數</label><input id="bRounds" type="number" min="10" max="5000" value="100"></div>
+        <div class="field"><label for="bModel">玩家收手模型</label>
+          <select id="bModel">
+            <option value="coupled">原碼：目標 1/V^(1/p)，跟著 p 變</option>
+            <option value="fixedDist">目標 1/V，不受 p 影響</option>
+            <option value="fixed">固定倍數收手</option>
+          </select>
+        </div>
+        <div class="field" id="bFixedWrap" hidden><label for="bFixed">固定收手倍數</label><input id="bFixed" type="number" min="1.01" max="360" step="0.01" value="2.00"></div>
+        <div class="field"><label for="bSeed">亂數種子</label><input id="bSeed" type="number" min="0" value="42"></div>
+        <button type="submit" class="run-btn" id="bRun">開始模擬</button>
+      </form>
+      <div class="progress" id="bProg" hidden><span></span></div>
+      <p class="verdict" id="bVerdict">設定好之後按「開始模擬」。</p>
+      <div class="bulk-grid">
+        <div class="card">
+          <div class="card-h"><h3>結果對照</h3><span class="legend" id="bMeta"></span></div>
+          <div class="table-scroll"><table class="metrics" id="bTable"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>每場最終 RTP 分布</h3><span class="legend"><span><i style="background:var(--rtp)"></i>無殺率</span><span><i style="background:var(--accent)"></i>有殺率</span></span></div>
+          <canvas class="chart" id="bHist"></canvas>
+          <p class="cap">每格 0.1，等同原碼的 <code>stat</code>；虛線是 120% 殺率門檻。</p>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>樣本場次</h3>
+            <div class="sample-nav"><button class="tiny" id="bPrev" type="button">上一場</button><span id="bSampleLbl">—</span><button class="tiny" id="bNext" type="button">下一場</button></div>
+          </div>
+          <canvas class="chart" id="bSample"></canvas>
+          <p class="cap">同一組亂數的兩條累計 RTP。藍點＝強制爆、金點＝暴衝標記，畫在觸發當下的 RTP 上（原碼 <code>Oboom</code>／<code>capture</code> 的配色）。只列有被強制爆的場次。</p>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>有殺率時 p 的分布</h3></div>
+          <canvas class="chart" id="bPower"></canvas>
+          <p class="cap">每局結束時的 p，縱軸 log10(局數)，等同原碼的 <code>powerstat</code> 圖。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-rules" hidden>
+    <article class="rules">
+      <h2>規則與原碼對照</h2>
+      <h3>怎麼玩</h3>
+      <p>下注後火箭起飛，倍數照 <code>m(t) = e^(0.16t)</code> 往上爬：1× 速度下約 4.3 秒到 2×、14 秒到 10×、29 秒到 100×。爆炸前按「收手」拿回「注額 × 當下倍數」；來不及就整注沒收。到 360× 自動收手，對應原碼的賠付上限。</p>
+      <h3>爆點怎麼抽</h3>
+<pre>odds = round(1 / U^(1/p), 2)        U ~ Uniform(0, 1)
+P(爆點 ≥ x) = x^(−p)</pre>
+      <p>p = 1 時，任何「在 x 倍收手」的策略期望 RTP 都是 x × 1/x = 100%。原碼用四捨五入而不是無條件捨去，等於每個爆點多送 0.005，所以無殺率版其實略高於 100%：固定在 2× 收手是 2 ÷ 1.995 ≈ 100.25%。換句話說，這個遊戲的莊家優勢全部來自殺率控制。</p>
+      <h3>殺率控制器（只在有殺率時動作）</h3>
+<pre>下注後先抽爆點，再看「到上一局為止的本 session 累計 RTP」：
+  RTP &gt; 120%:
+      duration += 1
+      若 duration &gt; 5 或 本局注額 &gt; 2 × 典型注額:
+          30% 機率 → 爆點改成 round(Uniform(1, 1.05), 2)
+                      p += 0.1（上限 2.5）
+  RTP ≤ 120%:
+      duration = 0，p = 1</pre>
+      <p>典型注額來自 <code>targetfunction(最近 50 注)</code>：排序後各去掉一個最小、最大值，切成低／中／高三段，分別以 min、平均、max 為中心算平均平方差，取總和最小的切法，回傳人數最多那一段的平均。p 是在抽完本局爆點之後才更新，所以降溫後的第一局仍用舊的 p 抽爆點。</p>
+      <h3>p 有多狠</h3>
+      <p>p &gt; 1 時，固定在 x 倍收手的期望 RTP 變成 x^(1−p)。收手點越高，被尾巴截得越兇：</p>
+      <div class="table-scroll"><table class="metrics" id="pTable"></table></div>
+      <h3>大樣本結果（引擎與本頁相同，seed 11）</h3>
+      <div class="table-scroll"><table class="metrics">
+        <thead><tr><th>玩家模型</th><th>每場局數</th><th>場次</th><th>無殺率 RTP</th><th>有殺率 RTP</th><th>差</th></tr></thead>
+        <tbody>
+          <tr><td>原碼機器人（目標跟著 p 變）</td><td>100</td><td>200,000</td><td>100.21%</td><td>94.86%</td><td class="d">−5.35 pp</td></tr>
+          <tr><td>目標 1/V，不受 p 影響</td><td>100</td><td>200,000</td><td>100.21%</td><td>94.48%</td><td class="d">−5.73 pp</td></tr>
+          <tr><td>固定 1.5× 收手</td><td>100</td><td>200,000</td><td>100.33%</td><td>97.97%</td><td class="d">−2.36 pp</td></tr>
+          <tr><td>固定 2× 收手</td><td>100</td><td>200,000</td><td>100.31%</td><td>95.62%</td><td class="d">−4.69 pp</td></tr>
+          <tr><td>固定 5× 收手</td><td>100</td><td>200,000</td><td>100.19%</td><td>89.37%</td><td class="d">−10.82 pp</td></tr>
+          <tr><td>原碼機器人</td><td>1,000</td><td>20,000</td><td>99.97%</td><td>97.78%</td><td class="d">−2.19 pp</td></tr>
+          <tr><td>原碼機器人</td><td>10,000</td><td>2,000</td><td>99.92%</td><td>99.55%</td><td class="d">−0.37 pp</td></tr>
+        </tbody>
+      </table></div>
+      <p>控制器看的是「本 session 累計 RTP」，所以它主要在 session 前段出手：session 越長，累計 RTP 越難衝過 120%，抽成就越薄。</p>
+      <h3>這一頁和原碼一致到什麼程度</h3>
+      <ul>
+        <li><code>targetfunction</code>：4,000 組注額歷史（原碼機器人、真人式加減注、隨機整數、全相同）回傳值逐位元相同。本頁用 O(n²) 寫法，但浮點運算順序和原碼的 O(n³) 迴圈一樣。</li>
+        <li>整局流程：在原碼裡錄下每一次 <code>np.random</code> 的輸出，再餵給本頁引擎重播。7 段錄製（殺率開／關、130 個 cycle、13,000 局）每局累計 RTP、<code>Oboom</code>、<code>capture</code>、<code>powerstat</code>、<code>stat</code> 與總數全部相同，亂數也剛好用完。</li>
+        <li>試玩版由你自己決定收手點；原碼的 1/V^(1/p) 機器人只用在批量模擬。</li>
+        <li>試玩的每個 session 從 p = 1 開始；原碼的 p 會延續到下一個 cycle，批量模擬保留這個行為。</li>
+        <li>到 360× 直接自動收手；原碼是「目標 ≥ 360 時賠 360」。只有目標超過 360、爆點又落在 360 和目標之間時結果不同，每局機率低於 0.3%。</li>
+        <li>試玩用瀏覽器的 <code>crypto.getRandomValues</code>；批量模擬用固定種子，同樣的設定會得到同樣的結果。</li>
+      </ul>
+    </article>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>/*__ENGINE__*/</script>
+<script>
+(() => {
+'use strict';
+const E = window.CrashEngine;
+const GROWTH = 0.16;            // m(t) = e^(0.16 t)
+const CAP = E.CAP;
+const START = 1000;
+const MONO = '"Martian Mono", ui-monospace, Menlo, Consolas, monospace';
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const LIVE = E.cryptoRng();
+const LIVE_R = { roll: LIVE, kill: LIVE };
+const LABEL = { off: '無殺率', on: '有殺率', blind: '盲測' };
+
+const fmtInt = n => Math.round(n).toLocaleString('en-US');
+const fmtSigned = n => { const r = Math.round(n); return r === 0 ? '0' : (r > 0 ? '+' : '−') + Math.abs(r).toLocaleString('en-US'); };
+const pct = (x, d = 1) => (x * 100).toFixed(d) + '%';
+const fmtX = x => !isFinite(x) ? '∞×' : (x >= 10000 ? fmtInt(x) : x.toFixed(2)) + '×';
+const fmtNum = x => (Math.round(x * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const pad3 = n => String(n).padStart(3, '0');
+const lastOf = a => a[a.length - 1];
+
+// ---------------- sessions ----------------
+function makeSession(key) {
+  const killOn = key === 'blind' ? LIVE.uniform() < 0.5 : key === 'on';
+  return { key, killOn, st: E.newSession({ killOn, captureAlways: true }), balance: START, refills: 0,
+           rec: [], wins: 0, sumBet: 0, sumPay: 0, revealed: key !== 'blind', guess: null };
+}
+let S = { off: makeSession('off'), on: makeSession('on'), blind: makeSession('blind') };
+let modeKey = 'off';
+let houseOn = false;
+const cur = () => S[modeKey];
+const peek = s => houseOn && s.revealed;
+
+// ---------------- round state ----------------
+const G = { phase: 'idle', r: null, speed: 1, gameTime: 0, last: 0, skip: false, batching: false,
+            auto: { on: false, left: 0, timer: 0 } };
+const fx = { parts: [], chutes: [], flash: null, ring: null, shake: 0 };
+
+function readBet() { const v = Number($('#bet').value); return Number.isInteger(v) && v >= 1 ? v : null; }
+function readAutoT() {
+  if (!$('#autoOn').checked) return null;
+  const v = Number($('#autoT').value);
+  if (!isFinite(v)) return null;
+  return Math.min(CAP, Math.max(1.01, Math.round(v * 100) / 100));
+}
+
+function startRound(fromAuto) {
+  if (G.phase === 'flying') return false;
+  const s = cur();
+  const bet = readBet();
+  if (bet == null) { toast('注額要是 1 以上的整數'); return false; }
+  if (bet > s.balance) { toast('餘額不足：降低注額，或按「補 1,000」'); renderKpis(); return false; }
+  if (G.speed === 0 && !$('#autoOn').checked) { $('#autoOn').checked = true; syncCash(); }
+  const autoT = readAutoT();
+  s.balance -= bet;
+  const info = E.beginRound(s.st, bet, LIVE_R, null);
+  const crash = info.odds;
+  const capped = !(crash < CAP);
+  G.r = { s, bet, info, crash, capped, autoT, cashedAt: null, cashT: null, payout: 0, n: s.rec.length + 1,
+          fromAuto: !!fromAuto, tEnd: Math.log(capped ? CAP : crash) / GROWTH };
+  G.gameTime = 0; G.skip = false; G.phase = 'flying';
+  fx.parts.length = 0; fx.chutes.length = 0; fx.flash = null; fx.ring = null; fx.shake = 0;
+  if (G.speed === 0) finishInstant();
+  else { renderGo(); renderKpis(); lockUi(); }
+  return true;
+}
+
+function cashOut(x, t) {
+  const r = G.r;
+  if (!r || r.cashedAt != null) return;
+  r.cashedAt = x; r.cashT = t;
+  r.payout = (x < CAP ? x : CAP) * r.bet;
+  r.s.balance += r.payout;
+  if (!G.batching) { spawnChute(t, r.payout - r.bet); renderGo(); renderKpis(); }
+}
+function manualCashOut() {
+  const r = G.r;
+  if (G.phase !== 'flying' || !r || r.cashedAt != null) return;
+  let m = Math.floor(Math.exp(GROWTH * G.gameTime) * 100) / 100;
+  m = Math.max(1, Math.min(m, r.crash, CAP));
+  cashOut(m, Math.log(m) / GROWTH);
+}
+function finishInstant() {
+  const r = G.r;
+  if (r.autoT != null && r.autoT <= r.crash) cashOut(r.autoT, Math.log(r.autoT) / GROWTH);
+  G.gameTime = r.tEnd;
+  endRound();
+}
+function endRound() {
+  const r = G.r, s = r.s, i = r.info;
+  if (r.capped && r.cashedAt == null) cashOut(CAP, r.tEnd);
+  const payout = E.settle(s.st, r.bet, r.cashedAt, r.crash);
+  if (Math.abs(payout - r.payout) > 1e-9) s.balance += payout - r.payout; // never expected; keeps balance honest
+  s.sumBet += r.bet; s.sumPay += payout;
+  if (r.cashedAt != null) s.wins++;
+  s.rec.push({ n: r.n, bet: r.bet, crash: r.crash, capped: r.capped, cashedAt: r.cashedAt, payout, rtp: lastOf(s.st.rtph),
+    rtpB: i.rtpBefore, hot: i.hot, dur: i.duration, spike: i.spike, bar: i.bar, checked: i.checked, roll: i.killRoll,
+    forced: i.forced, natural: i.natural, pB: i.powerBefore, pA: i.powerAfter });
+  G.phase = 'ended';
+  if (!G.batching) {
+    if (r.capped) spawnRing(); else spawnExplosion();
+    renderAll();
+  }
+  afterRound(r);
+}
+
+// ---------------- auto play ----------------
+function afterRound(r) {
+  if (!G.auto.on) return;
+  if (r.fromAuto) G.auto.left--;
+  if (G.auto.left <= 0) { stopAuto(); return; }
+  if (G.batching) return;
+  clearTimeout(G.auto.timer);
+  if (G.speed === 0) G.auto.timer = setTimeout(runBatch, 20);
+  else G.auto.timer = setTimeout(() => { if (G.auto.on && !startRound(true)) stopAuto(); }, Math.round(800 / G.speed));
+  renderAutoBtn();
+}
+function runBatch() {
+  if (!G.auto.on) return;
+  if (G.speed !== 0) { if (!startRound(true)) stopAuto(); return; }
+  G.batching = true;
+  const t0 = performance.now();
+  let ok = true;
+  while (G.auto.on && G.speed === 0 && performance.now() - t0 < 16) {
+    if (!startRound(true)) { ok = false; break; }
+  }
+  G.batching = false;
+  if (!ok) stopAuto();
+  renderAll();
+  if (G.auto.on) G.auto.timer = setTimeout(runBatch, 0);
+}
+function startAuto() {
+  const n = Math.floor(Number($('#autoN').value));
+  if (!(n >= 1)) { toast('自動連玩的局數要 ≥ 1'); return; }
+  if (!$('#autoOn').checked) { $('#autoOn').checked = true; syncCash(); toast('自動連玩用自動收手：' + fmtX(readAutoT())); }
+  G.auto.on = true; G.auto.left = Math.min(n, 100000);
+  renderAutoBtn(); lockUi(); renderGo();
+  if (G.phase === 'flying') return; // the current flight finishes first
+  if (G.speed === 0) runBatch();
+  else if (!startRound(true)) stopAuto();
+}
+function stopAuto() {
+  clearTimeout(G.auto.timer);
+  G.auto.on = false; G.auto.left = 0;
+  renderAutoBtn(); lockUi(); renderGo();
+}
+function setSpeed(v) {
+  G.speed = v;
+  $$('#speedSeg button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === v)));
+  if (v === 0 && !$('#autoOn').checked) { $('#autoOn').checked = true; syncCash(); toast('瞬間模式靠自動收手結算，已開啟：' + fmtX(readAutoT())); }
+  if (G.auto.on && G.phase !== 'flying') {
+    clearTimeout(G.auto.timer);
+    G.auto.timer = setTimeout(v === 0 ? runBatch : () => { if (G.auto.on && !startRound(true)) stopAuto(); }, 60);
+  }
+}
+
+// ---------------- frame loop ----------------
+function frame(now) {
+  const dt = Math.min(0.05, Math.max(0, (now - (G.last || now)) / 1000));
+  G.last = now;
+  if (G.phase === 'flying') {
+    const r = G.r;
+    G.gameTime = G.skip ? r.tEnd : G.gameTime + dt * (G.speed || 4);
+    if (r.cashedAt == null && r.autoT != null && r.autoT <= r.crash) {
+      const ta = Math.log(r.autoT) / GROWTH;
+      if (G.gameTime >= ta) cashOut(r.autoT, ta);
+    }
+    if (G.gameTime >= r.tEnd) { G.gameTime = r.tEnd; endRound(); }
+  }
+  stepFx(dt);
+  drawSky(now);
+  paintReadout();
+  requestAnimationFrame(frame);
+}
+
+// ---------------- sky rendering ----------------
+let SW = 1, SH = 1, sctx = null, SC = 1;
+const STARS = Array.from({ length: 170 }, () => ({ x: Math.random(), y: Math.random() * 0.9, s: Math.random() * 1.3 + 0.35, ph: Math.random() * 6.28, d: 0.25 + Math.random() * 0.75 }));
+const EXPL = ['#FFF4C9', '#FFC062', '#FF8A3C', '#FF5A4E', '#B23A48', '#8C95AD'];
+function sizeSky() {
+  const box = $('#skyBox'), cv = $('#sky');
+  const rect = box.getBoundingClientRect();
+  if (rect.width < 2) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  SW = rect.width; SH = rect.height;
+  cv.width = Math.round(SW * dpr); cv.height = Math.round(SH * dpr);
+  sctx = cv.getContext('2d');
+  if (sctx) sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  SC = Math.max(0.8, Math.min(1.35, SW / 720));
+}
+function niceStep(range, maxTicks) {
+  const c = [0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+  for (const v of c) if (range / v <= maxTicks) return v;
+  return 10000;
+}
+function geom() {
+  const pad = { l: 54, r: 26, t: 44, b: 30 };
+  const t = G.r ? G.gameTime : 0;
+  const m = Math.exp(GROWTH * t);
+  const tMax = Math.max(8, t * 1.16);
+  const yMax = Math.max(2, 1 + (m - 1) * 1.24);
+  const pw = SW - pad.l - pad.r, ph = SH - pad.t - pad.b;
+  return { pad, t, m, tMax, yMax, pw, ph,
+    X: tt => pad.l + (tt / tMax) * pw,
+    Y: mm => pad.t + ph - ((mm - 1) / (yMax - 1)) * ph };
+}
+function rocketPose(g) {
+  const t = G.r ? G.gameTime : 0, m = Math.exp(GROWTH * t);
+  const dx = g.pw / g.tMax, dy = -(GROWTH * m) * g.ph / (g.yMax - 1);
+  return { x: g.X(t), y: g.Y(m), a: Math.atan2(dy, dx) };
+}
+const axisX = v => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/0+$/, '')) + '×';
+function drawSky(now) {
+  const c = sctx;
+  if (!c || currentView !== 'play') return;
+  const g = geom();
+  c.save();
+  if (fx.shake > 0) c.translate((Math.random() - 0.5) * 16 * fx.shake, (Math.random() - 0.5) * 16 * fx.shake);
+  const bg = c.createLinearGradient(0, 0, 0, SH);
+  bg.addColorStop(0, '#081430'); bg.addColorStop(0.72, '#152A51'); bg.addColorStop(1, '#2D2B4B');
+  c.fillStyle = bg; c.fillRect(-24, -24, SW + 48, SH + 48);
+  const glow = c.createRadialGradient(g.pad.l, SH, 4, g.pad.l, SH, Math.max(SW, SH) * 0.8);
+  glow.addColorStop(0, 'rgba(255,128,48,0.26)'); glow.addColorStop(1, 'rgba(255,128,48,0)');
+  c.fillStyle = glow; c.fillRect(0, 0, SW, SH);
+  const drift = g.t * 0.012;
+  c.fillStyle = '#E6ECFF';
+  for (const s of STARS) {
+    const x = (((s.x - drift * s.d) % 1) + 1) % 1;
+    c.globalAlpha = s.d * (reduceMotion ? 0.6 : 0.42 + 0.3 * Math.sin(s.ph + now * 0.0015));
+    c.fillRect(x * SW, s.y * SH, s.s, s.s);
+  }
+  c.globalAlpha = 1;
+  // grid
+  c.font = '500 10.5px ' + MONO;
+  c.lineWidth = 1;
+  const ys = niceStep(g.yMax - 1, 4);
+  const ticks = [1];
+  if (ys < 1) { for (let k = 1; 1 + k * ys <= g.yMax + 1e-9; k++) ticks.push(1 + k * ys); }
+  else { for (let v = ys; v <= g.yMax + 1e-9; v += ys) if (v - 1 > ys * 0.35) ticks.push(v); }
+  c.textAlign = 'right'; c.textBaseline = 'middle';
+  for (const v of ticks) {
+    const y = Math.round(g.Y(v)) + 0.5;
+    c.strokeStyle = v === 1 ? 'rgba(196,210,250,0.28)' : 'rgba(196,210,250,0.09)';
+    c.beginPath(); c.moveTo(g.pad.l, y); c.lineTo(SW - g.pad.r, y); c.stroke();
+    c.fillStyle = 'rgba(196,210,250,0.62)'; c.fillText(axisX(v), g.pad.l - 8, y);
+  }
+  const xs = niceStep(g.tMax, SW < 520 ? 4 : 7);
+  c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = 'rgba(196,210,250,0.5)';
+  for (let k = 0; k * xs <= g.tMax + 1e-9; k++) c.fillText((k * xs) + 's', g.X(k * xs), SH - g.pad.b + 9);
+  if (G.r) drawTrajectory(c, g);
+  const r = G.r;
+  const exploded = r && G.phase === 'ended' && !r.capped;
+  if (!exploded) { const p = rocketPose(g); drawRocket(c, p.x, p.y, p.a, G.phase === 'flying', r && r.capped && G.phase === 'ended'); }
+  drawFx(c);
+  c.restore();
+}
+function drawTrajectory(c, g) {
+  const r = G.r, tE = G.gameTime, N = 110;
+  const busted = G.phase === 'ended' && !r.capped;
+  const path = new Path2D();
+  for (let k = 0; k <= N; k++) {
+    const tt = tE * k / N, x = g.X(tt), y = g.Y(Math.exp(GROWTH * tt));
+    if (k) path.lineTo(x, y); else path.moveTo(x, y);
+  }
+  const area = new Path2D(path);
+  area.lineTo(g.X(tE), g.Y(1)); area.lineTo(g.X(0), g.Y(1)); area.closePath();
+  const ag = c.createLinearGradient(0, g.pad.t, 0, g.Y(1));
+  ag.addColorStop(0, busted ? 'rgba(255,90,78,0.24)' : 'rgba(255,150,64,0.26)');
+  ag.addColorStop(1, 'rgba(255,150,64,0)');
+  c.fillStyle = ag; c.fill(area);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = busted ? 'rgba(255,90,78,0.22)' : 'rgba(255,150,64,0.20)'; c.lineWidth = 12; c.stroke(path);
+  c.strokeStyle = busted ? 'rgba(255,128,108,0.7)' : 'rgba(255,186,110,0.72)'; c.lineWidth = 4.5; c.stroke(path);
+  c.strokeStyle = busted ? '#FFD3CB' : '#FFEACB'; c.lineWidth = 1.6; c.stroke(path);
+  if (r.cashedAt != null && r.cashT != null) {
+    const tc = Math.min(r.cashT, tE), x = g.X(tc), y = g.Y(Math.exp(GROWTH * tc));
+    c.fillStyle = '#55E3A0'; c.beginPath(); c.arc(x, y, 4.5, 0, 6.2832); c.fill();
+    c.font = '600 11px ' + MONO; c.textAlign = 'left'; c.textBaseline = 'bottom';
+    c.fillText('收 ' + fmtX(r.cashedAt), Math.min(x + 8, SW - 90), y - 5);
+  }
+}
+function drawRocket(c, x, y, a, flame, golden) {
+  c.save(); c.translate(x, y); c.rotate(a); c.scale(SC, SC);
+  if (flame) {
+    const L = 16 + Math.random() * 12;
+    const fg = c.createLinearGradient(-12, 0, -12 - L, 0);
+    fg.addColorStop(0, 'rgba(255,246,220,1)'); fg.addColorStop(0.35, 'rgba(255,176,72,0.95)'); fg.addColorStop(1, 'rgba(255,84,40,0)');
+    c.fillStyle = fg;
+    c.beginPath(); c.moveTo(-11, -4.5); c.quadraticCurveTo(-14 - L * 0.5, -2.6, -12 - L, 0); c.quadraticCurveTo(-14 - L * 0.5, 2.6, -11, 4.5); c.closePath(); c.fill();
+  }
+  c.fillStyle = '#E2580F';
+  c.beginPath(); c.moveTo(-4, -5.5); c.lineTo(-13, -12.5); c.lineTo(-11, -5.5); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(-4, 5.5); c.lineTo(-13, 12.5); c.lineTo(-11, 5.5); c.closePath(); c.fill();
+  const body = c.createLinearGradient(0, -6, 0, 6);
+  body.addColorStop(0, golden ? '#FFF1A8' : '#FFFFFF'); body.addColorStop(1, golden ? '#E2B42A' : '#B8C2D6');
+  c.fillStyle = body;
+  c.beginPath(); c.moveTo(-12, -5.5); c.lineTo(4, -5.5); c.quadraticCurveTo(14, -5, 19.5, 0); c.quadraticCurveTo(14, 5, 4, 5.5); c.lineTo(-12, 5.5); c.closePath(); c.fill();
+  c.fillStyle = '#E2580F';
+  c.beginPath(); c.moveTo(11.5, -4.2); c.quadraticCurveTo(16, -3, 19.5, 0); c.quadraticCurveTo(16, 3, 11.5, 4.2); c.closePath(); c.fill();
+  c.fillStyle = '#16284D'; c.beginPath(); c.arc(3, 0, 2.6, 0, 6.2832); c.fill();
+  c.strokeStyle = '#8FA6DE'; c.lineWidth = 1; c.stroke();
+  c.restore();
+}
+function spawnChute(t, profit) {
+  if (currentView !== 'play') return;
+  const g = geom();
+  fx.chutes.push({ x: g.X(t), y: g.Y(Math.exp(GROWTH * t)), vy: 15, age: 0, life: 3.2, txt: fmtSigned(profit) });
+}
+function spawnExplosion() {
+  const g = geom(), p = rocketPose(g), n = reduceMotion ? 16 : 70;
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * 6.2832, v = 40 + Math.random() * 230;
+    fx.parts.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, age: 0, life: 0.7 + Math.random() * 0.9,
+                    r: 1 + Math.random() * 2.6, c: EXPL[(Math.random() * EXPL.length) | 0], g: 130 });
+  }
+  fx.flash = { x: p.x, y: p.y, age: 0, life: 0.45 };
+  fx.shake = reduceMotion ? 0 : 0.35;
+}
+function spawnRing() { const g = geom(), p = rocketPose(g); fx.ring = { x: p.x, y: p.y, age: 0, life: 1.3 }; }
+function stepFx(dt) {
+  if (G.phase === 'flying' && !reduceMotion && currentView === 'play') {
+    const g = geom(), p = rocketPose(g);
+    for (let k = 0; k < 2; k++) {
+      const back = p.a + Math.PI + (Math.random() - 0.5) * 0.6, v = 30 + Math.random() * 50;
+      fx.parts.push({ x: p.x - Math.cos(p.a) * 13 * SC, y: p.y - Math.sin(p.a) * 13 * SC, vx: Math.cos(back) * v, vy: Math.sin(back) * v,
+                      age: 0, life: 0.5 + Math.random() * 0.45, r: 1.4 + Math.random() * 1.8, c: 'smoke', g: -8 });
+    }
+  }
+  for (const q of fx.parts) { q.age += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += q.g * dt; q.vx *= 0.985; }
+  fx.parts = fx.parts.filter(q => q.age < q.life);
+  if (fx.parts.length > 420) fx.parts.splice(0, fx.parts.length - 420);
+  for (const ch of fx.chutes) { ch.age += dt; ch.y += ch.vy * dt; }
+  fx.chutes = fx.chutes.filter(ch => ch.age < ch.life);
+  if (fx.flash && (fx.flash.age += dt) > fx.flash.life) fx.flash = null;
+  if (fx.ring && (fx.ring.age += dt) > fx.ring.life) fx.ring = null;
+  fx.shake = Math.max(0, fx.shake - dt);
+}
+function drawFx(c) {
+  for (const q of fx.parts) {
+    const k = 1 - q.age / q.life;
+    if (q.c === 'smoke') { c.globalAlpha = 0.32 * k; c.fillStyle = '#C9D3EA'; }
+    else { c.globalAlpha = Math.min(1, k * 1.4); c.fillStyle = q.c; }
+    c.beginPath(); c.arc(q.x, q.y, q.r * (q.c === 'smoke' ? 1 + (1 - k) * 2.6 : 1), 0, 6.2832); c.fill();
+  }
+  c.globalAlpha = 1;
+  if (fx.flash) {
+    const f = fx.flash, k = f.age / f.life, R = 36 + 44 * k;
+    const rg = c.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+    rg.addColorStop(0, `rgba(255,240,200,${0.9 * (1 - k)})`); rg.addColorStop(1, 'rgba(255,120,60,0)');
+    c.fillStyle = rg; c.beginPath(); c.arc(f.x, f.y, R, 0, 6.2832); c.fill();
+    c.globalAlpha = 1 - k; c.strokeStyle = '#FFE7B0'; c.lineWidth = 2.5;
+    c.beginPath(); c.arc(f.x, f.y, 8 + k * 74, 0, 6.2832); c.stroke(); c.globalAlpha = 1;
+  }
+  if (fx.ring) {
+    const f = fx.ring, k = f.age / f.life;
+    c.globalAlpha = 1 - k; c.strokeStyle = '#FFD84A'; c.lineWidth = 3;
+    c.beginPath(); c.arc(f.x, f.y, 12 + k * 90, 0, 6.2832); c.stroke(); c.globalAlpha = 1;
+  }
+  for (const ch of fx.chutes) {
+    const k = ch.age / ch.life, x = ch.x + Math.sin(ch.age * 3) * 4, y = ch.y;
+    c.globalAlpha = k < 0.8 ? 1 : (1 - k) / 0.2;
+    c.fillStyle = '#55E3A0'; c.beginPath(); c.arc(x, y - 17, 10, Math.PI, 0); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(220,255,236,0.85)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x - 10, y - 17); c.lineTo(x, y - 3); c.lineTo(x + 10, y - 17); c.stroke();
+    c.fillStyle = '#E8FFF3'; c.fillRect(x - 2.5, y - 4, 5, 5);
+    c.font = '700 12px ' + MONO; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = '#55E3A0';
+    c.fillText(ch.txt, x, y + 4);
+    c.globalAlpha = 1;
+  }
+}
+
+// ---------------- readout / HUD ----------------
+let lastPaint = '';
+function paintReadout() {
+  const r = G.r;
+  let mult, sub, state, t = 0;
+  if (!r) { mult = '1.00×'; sub = '按「起飛」或空白鍵開始'; state = 'idle'; }
+  else if (G.phase === 'flying') {
+    t = G.gameTime;
+    const m = Math.floor(Math.min(Math.exp(GROWTH * t), r.capped ? CAP : r.crash) * 100) / 100;
+    mult = fmtX(m); state = m >= 10 ? 'gold' : m >= 2 ? 'warm' : 'fly';
+    sub = r.cashedAt != null
+      ? `已在 ${fmtX(r.cashedAt)} 收手 <span class="pos">${fmtSigned(r.payout - r.bet)}</span>`
+      : `現在收手拿回 <span class="pos">${fmtInt(m * r.bet)}</span>`;
+    if (r.cashedAt == null) { const sm = $('#goBtn small'); const txt = '拿回 ' + fmtInt(m * r.bet); if (sm && sm.textContent !== txt) sm.textContent = txt; }
+  } else {
+    t = r.tEnd;
+    if (r.capped) { mult = fmtX(CAP); state = 'gold'; sub = `觸頂（爆點 ${fmtX(r.crash)}）`; }
+    else { mult = fmtX(r.crash); state = 'bust'; sub = '爆炸'; }
+    sub += r.cashedAt != null ? ` · 已在 ${fmtX(r.cashedAt)} 收手 <span class="pos">${fmtSigned(r.payout - r.bet)}</span>`
+                              : ` · <span class="neg">${fmtSigned(-r.bet)}</span>`;
+    if (peek(r.s) && r.info.forced) sub += `<br><span class="kill">後台強制爆：自然爆點本來是 ${fmtX(r.info.natural)}</span>`;
+  }
+  const key = mult + '|' + sub + '|' + state;
+  if (key !== lastPaint) {
+    lastPaint = key;
+    const el = $('#mult'); el.textContent = mult; el.dataset.state = state;
+    $('#readSub').innerHTML = sub;
+  }
+  const flt = 'FLT ' + pad3(r ? r.n : cur().rec.length + 1), tt = 'T+' + t.toFixed(1) + 's';
+  if ($('#hudFlt').textContent !== flt) $('#hudFlt').textContent = flt;
+  if ($('#hudT').textContent !== tt) $('#hudT').textContent = tt;
+}
+function renderHud() {
+  const s = cur();
+  $('#hudMode').textContent = s.revealed ? LABEL[s.key] + (s.key === 'blind' ? '＝' + LABEL[s.killOn ? 'on' : 'off'] : '') : '盲測';
+  const h = $('#hudHouse');
+  h.hidden = !peek(s);
+  if (!peek(s)) return;
+  const st = s.st, rtp = lastOf(st.rtph), hot = s.killOn && rtp > E.HOT;
+  h.textContent = `p ${st.power.toFixed(1)} · ${hot ? '熱' : '冷'} · dur ${st.duration}`;
+}
+
+// ---------------- panels ----------------
+function renderPads() {
+  for (const k of ['off', 'on', 'blind']) {
+    const s = S[k], n = s.rec.length;
+    $('#padsub-' + k).textContent = n ? `RTP ${pct(lastOf(s.st.rtph))} · ${n} 局` : '還沒飛';
+    $('#pad-' + k).setAttribute('aria-selected', String(k === modeKey));
+  }
+  const b = S.blind, tag = $('#blindTag');
+  tag.textContent = b.revealed ? (b.killOn ? 'ON' : 'OFF') : '?';
+  tag.className = 'tag ' + (b.revealed && b.killOn ? 'on' : 'off');
+}
+function renderKpis() {
+  const s = cur(), n = s.rec.length;
+  $('#kBal').textContent = fmtInt(s.balance);
+  $('#kBalSub').textContent = s.refills ? `起始 1,000 · 補充 ${s.refills} 次` : '起始 1,000';
+  const bet = readBet() || 1;
+  $('#refillBtn').hidden = !(s.balance < bet) || G.phase === 'flying';
+  if (n) {
+    $('#kRtp').textContent = pct(lastOf(s.st.rtph), 1);
+    $('#kRtpSub').textContent = `下注 ${fmtInt(s.sumBet)} · 返還 ${fmtInt(s.sumPay)}`;
+  } else { $('#kRtp').textContent = '—'; $('#kRtpSub').textContent = '還沒下注'; }
+  $('#kN').textContent = fmtInt(n);
+  $('#kNSub').textContent = n ? `收手成功率 ${pct(s.wins / n, 0)}` : '收手成功率 —';
+  const net = s.sumPay - s.sumBet, kn = $('#kNet');
+  kn.textContent = fmtSigned(net);
+  kn.className = 'v' + (Math.round(net) > 0 ? ' pos' : Math.round(net) < 0 ? ' neg' : '');
+}
+function renderTape() {
+  const s = cur(), items = s.rec.slice(-36).reverse(), show = peek(s);
+  $('#tape').innerHTML = items.length ? items.map(r => {
+    const cls = r.crash < 1.2 ? 'lo' : r.crash < 2 ? 'mid' : r.crash < 10 ? 'hi' : 'top';
+    const f = show && r.forced;
+    return `<span class="tp ${cls}${f ? ' forced' : ''}" title="FLT ${pad3(r.n)}${f ? ' · 強制爆' : ''}">${r.capped ? '360×+' : fmtX(r.crash)}</span>`;
+  }).join('') : '<span class="empty">最近的爆點會排在這裡</span>';
+}
+function renderGo() {
+  const btn = $('#goBtn'), r = G.r;
+  let main, small, cls = 'go-btn', dis = false;
+  if (G.phase === 'flying' && r) {
+    if (r.cashedAt == null) { main = '收手'; small = '拿回 ' + fmtInt(r.bet); cls += ' cash'; }
+    else { main = '已收手'; small = fmtX(r.cashedAt) + ' · ' + fmtSigned(r.payout - r.bet); dis = true; }
+  } else {
+    main = G.auto.on ? '自動中' : '起飛'; small = '下注 ' + fmtInt(readBet() || 0); dis = G.auto.on;
+  }
+  btn.className = cls; btn.disabled = dis;
+  btn.innerHTML = `${main}<small>${small}</small>`;
+  $('#skipBtn').hidden = !(G.phase === 'flying' && r && r.cashedAt != null);
+}
+function renderAutoBtn() {
+  const b = $('#autoBtn');
+  b.textContent = G.auto.on ? `停止（剩 ${fmtInt(G.auto.left)}）` : '開始';
+  b.classList.toggle('on', G.auto.on);
+}
+function lockUi() {
+  const busy = G.phase === 'flying' || G.auto.on;
+  $$('.pad').forEach(p => { p.disabled = busy && p.dataset.mode !== modeKey; });
+  $('#resetBtn').disabled = busy;
+  $('#autoOn').disabled = G.auto.on || G.speed === 0;
+  $$('#blindBox button').forEach(b => { b.disabled = busy; });
+}
+function renderHouse() {
+  const s = cur(), box = $('#house');
+  const hs = $('#houseOn');
+  hs.disabled = !s.revealed;
+  $('#houseWhy').textContent = s.revealed ? '' : '盲測揭曉前鎖住';
+  box.hidden = !peek(s);
+  if (!peek(s)) return;
+  const st = s.st, rtp = lastOf(st.rtph), n = s.rec.length;
+  const hot = s.killOn && rtp > E.HOT;
+  const durNext = hot ? st.duration + 1 : 0;
+  const bar = st.past.length > 4 ? E.targetFunction(st.past) : null;
+  let next;
+  if (!s.killOn) next = '控制器關閉：不管輸贏都不干預，p 固定為 1。暴衝偵測照算，只是不出手。';
+  else if (!hot) next = 'RTP ≤ 120%：不干預。' + (st.power > 1 ? ` 這局爆點仍用 p = ${st.power.toFixed(1)} 抽，抽完才重設為 1。` : '');
+  else if (durNext > E.DUR_LIMIT) next = `第 ${durNext} 個熱局：不論注額，這局 30% 會被強制爆。`;
+  else if (bar != null) next = `第 ${durNext} 個熱局：注額 > ${fmtNum(2 * bar)} 才擲 30%；第 6 個熱局起每局都擲。`;
+  else next = `第 ${durNext} 個熱局：下注紀錄不足 5 局，暴衝偵測還沒啟動；第 6 個熱局起每局擲 30%。`;
+  const p2 = Math.pow(2, -st.power), p10 = Math.pow(10, -st.power);
+  let last = '';
+  const L = lastOf(s.rec);
+  if (L) {
+    last = `上一局 FLT ${pad3(L.n)}：RTP 前值 ${pct(L.rtpB)}`;
+    if (!s.killOn) last += '，控制器關閉。';
+    else if (!L.hot) last += '，冷，不干預。';
+    else {
+      last += `，第 ${L.dur} 個熱局${L.spike ? '、注額暴衝' : ''}`;
+      if (!L.checked) last += '，沒達到擲骰條件。';
+      else if (L.forced) last += `，擲出 ${L.roll.toFixed(3)} &lt; 0.30 → <b>強制爆 ${fmtX(L.crash)}</b>（自然爆點 ${fmtX(L.natural)}），p ${L.pB.toFixed(1)} → ${L.pA.toFixed(1)}。`;
+      else last += `，擲出 ${L.roll.toFixed(3)} ≥ 0.30，放過。`;
+    }
+  }
+  box.innerHTML = `
+    <div class="card-h"><h2>後台：殺率控制器</h2><span class="tag ${s.killOn ? 'on' : 'off'}">${s.killOn ? 'ON' : 'OFF'}</span></div>
+    <dl class="hrows">
+      <dt>累計 RTP</dt><dd><span class="num">${n ? pct(rtp) : '—'}</span><span class="state ${hot ? 'hot' : 'cold'}">${hot ? '熱 > 120%' : '冷'}</span></dd>
+      <dt>連續熱局</dt><dd><span class="num">duration ${st.duration}</span>　超過 5 之後每局擲 30%</dd>
+      <dt>尾巴指數</dt><dd><span class="num">p ${st.power.toFixed(1)}</span>　P(爆點 ≥ 2×) ${pct(p2)}、≥ 10× ${pct(p10)}</dd>
+      <dt>典型注額</dt><dd>${bar != null ? `<span class="num">${fmtNum(bar)}</span>　暴衝門檻：注額 &gt; <span class="num">${fmtNum(2 * bar)}</span>` : '要累積 5 局下注才開始算'}</dd>
+      <dt>下一局</dt><dd>${next}</dd>
+      <dt>累計</dt><dd>強制爆 <span class="num">${st.suppress}</span> 次 · 暴衝標記 <span class="num">${st.capture.length}</span> 次</dd>
+    </dl>
+    ${last ? `<p class="lastcall">${last}</p>` : ''}`;
+}
+function renderBlind() {
+  const s = cur(), box = $('#blindBox');
+  box.hidden = s.key !== 'blind';
+  if (s.key !== 'blind') return;
+  if (!s.revealed) {
+    box.innerHTML = `<div class="card-h"><h2>盲測</h2><span class="tag off">模式隱藏</span></div>
+      <p>這個 session 有一半機率開著殺率控制。玩一陣子再猜；揭曉前後台視角鎖住。</p>
+      <div class="row"><button type="button" data-guess="on">我猜：有殺率</button><button type="button" data-guess="off">我猜：無殺率</button></div>`;
+  } else {
+    const verdict = s.guess == null ? '' : (s.guess === s.killOn ? '你猜對了。' : '你猜錯了。');
+    box.innerHTML = `<div class="card-h"><h2>盲測揭曉</h2><span class="tag ${s.killOn ? 'on' : 'off'}">${s.killOn ? 'ON' : 'OFF'}</span></div>
+      <p>答案是<b>${s.killOn ? '有殺率' : '無殺率'}</b>。${verdict}${s.rec.length} 局裡被強制爆 ${s.st.suppress} 次。</p>
+      <div class="row"><button type="button" data-newblind="1">開新的盲測</button></div>`;
+  }
+  lockUi();
+}
+function renderLedger() {
+  const s = cur(), show = peek(s);
+  const head = ['FLT', '注', '爆點', '收手', '損益', 'RTP'].concat(show ? ['熱局', '暴衝', '擲骰', '自然爆點', 'p'] : []);
+  $('#ledger thead').innerHTML = '<tr>' + head.map((h, k) => `<th${k === 0 ? ' class="l"' : ''}>${h}</th>`).join('') + '</tr>';
+  const rows = s.rec.slice(-90).reverse();
+  if (!rows.length) { $('#ledger tbody').innerHTML = `<tr><td class="empty" colspan="${head.length}">起飛之後，每一局都會記在這裡</td></tr>`; return; }
+  $('#ledger tbody').innerHTML = rows.map(r => {
+    const pl = r.payout - r.bet;
+    let tds = `<td class="l">${pad3(r.n)}</td><td>${fmtInt(r.bet)}</td><td>${r.capped ? '360×+' : fmtX(r.crash)}</td>
+      <td>${r.cashedAt != null ? fmtX(r.cashedAt) : '—'}</td><td class="${pl > 0 ? 'pos' : pl < 0 ? 'neg' : ''}">${fmtSigned(pl)}</td><td>${pct(r.rtp)}</td>`;
+    if (show) {
+      const p = r.pB.toFixed(1) + (r.pA !== r.pB ? '→' + r.pA.toFixed(1) : '');
+      tds += `<td>${r.hot ? r.dur : '—'}</td><td>${r.spike ? '<span class="sp">●</span>' : ''}</td>
+        <td>${r.roll != null ? (r.forced ? `<span class="kd">${r.roll.toFixed(2)}</span>` : r.roll.toFixed(2)) : '—'}</td>
+        <td>${r.forced ? fmtX(r.natural) : '—'}</td><td>${p}</td>`;
+    }
+    return `<tr${show && r.forced ? ' class="forced"' : ''}>${tds}</tr>`;
+  }).join('');
+}
+function renderLegend() {
+  const s = cur(), show = peek(s);
+  $('#traceLegend').innerHTML = `<span><i style="background:var(--rtp)"></i>累計 RTP</span><span><i style="background:var(--base)"></i>100%</span>` +
+    (show ? `<span><i style="background:var(--kill)"></i>120% 門檻</span><span><i class="dot" style="background:var(--kill)"></i>強制爆</span><span><i class="dot" style="background:var(--spike)"></i>暴衝</span>` : '');
+}
+function renderAll() {
+  renderPads(); renderKpis(); renderTape(); renderGo(); renderAutoBtn(); renderHouse(); renderBlind();
+  renderLedger(); renderLegend(); renderHud(); drawRtpChart(); lockUi();
+}
+
+// ---------------- charts ----------------
+const T = {};
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const n of ['--ink', '--muted', '--line', '--panel', '--accent', '--win', '--loss', '--kill', '--spike', '--rtp', '--base']) T[n] = cs.getPropertyValue(n).trim();
+}
+function setupCanvas(cv, h) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(10, cv.clientWidth);
+  if (cv.width !== Math.round(w * dpr)) cv.width = Math.round(w * dpr);
+  if (cv.height !== Math.round(h * dpr)) cv.height = Math.round(h * dpr);
+  cv.style.height = h + 'px';
+  const ctx = cv.getContext('2d');
+  if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+function lineChart(cv, h, o) {
+  const { ctx, w } = setupCanvas(cv, h);
+  if (!ctx) return;
+  ctx.clearRect(0, 0, w, h);
+  const pad = { l: 46, r: 12, t: 12, b: 24 }, pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  const n = Math.max(o.minX || 10, ...o.series.map(s => s.data.length - 1));
+  const yMax = o.yMax, yMin = 0;
+  const X = k => pad.l + (k / n) * pw;
+  const Y = v => pad.t + ph - ((Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * ph;
+  ctx.font = '10.5px ' + MONO; ctx.lineWidth = 1;
+  const ys = niceStep(yMax, 5);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let v = 0; v <= yMax + 1e-9; v += ys) {
+    const y = Math.round(Y(v)) + 0.5;
+    ctx.strokeStyle = T['--line']; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = T['--muted']; ctx.fillText(Math.round(v * 100) + '%', pad.l - 6, y);
+  }
+  const xs = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000].find(v => n / v <= (w < 420 ? 4 : 6)) || 100000;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = T['--muted'];
+  for (let k = 0; k <= n; k += xs) ctx.fillText(String(k), X(k), h - pad.b + 6);
+  for (const r of o.refs || []) {
+    const y = Math.round(Y(r.y)) + 0.5;
+    ctx.save(); ctx.strokeStyle = r.color; ctx.lineWidth = r.width || 1.2; if (r.dash) ctx.setLineDash(r.dash);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke(); ctx.restore();
+  }
+  if (o.empty) {
+    ctx.fillStyle = T['--muted']; ctx.font = '13px ' + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(o.empty, pad.l + pw / 2, pad.t + ph / 2 - 10);
+    return;
+  }
+  for (const s of o.series) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let k = 0; k < s.data.length; k++) { const x = X(k), y = Y(s.data[k]); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+    ctx.stroke();
+    if (s.end) {
+      const k = s.data.length - 1, x = X(k), y = Y(s.data[k]);
+      ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 6.2832); ctx.fill();
+    }
+  }
+  for (const m of o.markers || []) {
+    const s = o.series[m.s], v = s.data[m.k];
+    if (v == null) continue;
+    const x = X(m.k), y = Y(v);
+    ctx.fillStyle = m.color;
+    ctx.beginPath();
+    if (m.shape === 'tri') { ctx.moveTo(x, y - 6); ctx.lineTo(x + 5, y + 3); ctx.lineTo(x - 5, y + 3); ctx.closePath(); }
+    else ctx.arc(x, y, 4, 0, 6.2832);
+    ctx.fill();
+  }
+}
+function barChart(cv, h, o) {
+  const { ctx, w } = setupCanvas(cv, h);
+  if (!ctx) return;
+  ctx.clearRect(0, 0, w, h);
+  const pad = { l: 46, r: 10, t: 12, b: 24 }, pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  const n = o.cats, band = pw / n, gw = band * 0.84, bw = gw / o.groups.length;
+  const Y = v => pad.t + ph - (Math.min(v, o.yMax) / o.yMax) * ph;
+  ctx.font = '10.5px ' + MONO; ctx.lineWidth = 1;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const v of o.yTicks) {
+    const y = Math.round(Y(v)) + 0.5;
+    ctx.strokeStyle = T['--line']; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = T['--muted']; ctx.fillText(o.yFmt(v), pad.l - 6, y);
+  }
+  o.groups.forEach((g, gi) => {
+    ctx.fillStyle = g.color;
+    for (let c = 0; c < n; c++) {
+      const v = g.vals[c]; if (!v) continue;
+      const x = pad.l + c * band + (band - gw) / 2 + gi * bw, y = Y(v);
+      ctx.fillRect(x, y, Math.max(1, bw - (o.groups.length > 1 ? 1 : 0)), pad.t + ph - y);
+    }
+  });
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = T['--muted'];
+  for (let c = 0; c < n; c++) { const l = o.labelAt(c); if (l != null) ctx.fillText(l, pad.l + c * band + band / 2, h - pad.b + 6); }
+  if (o.vline != null) {
+    const x = Math.round(pad.l + o.vline * band) + 0.5;
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = T['--kill']; ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke(); ctx.restore();
+  }
+}
+let rtpW = 0;
+function drawRtpChart() {
+  const cv = $('#rtpChart');
+  if (currentView !== 'play' || !cv.clientWidth) return;
+  rtpW = cv.clientWidth;
+  const s = cur(), r = s.st.rtph, n = r.length - 1, show = peek(s);
+  let yMax = 1.5;
+  for (let k = Math.min(3, n); k <= n; k++) yMax = Math.max(yMax, r[k] * 1.08);
+  yMax = Math.min(Math.ceil(yMax * 4) / 4, 4);
+  const refs = [{ y: 1, color: T['--base'], width: 1.4 }];
+  if (show && s.killOn) refs.push({ y: E.HOT, color: T['--kill'], dash: [5, 4] });
+  const markers = [];
+  if (show) {
+    s.st.oboom.forEach(i => markers.push({ s: 0, k: i, color: T['--kill'] }));
+    s.st.capture.forEach(i => markers.push({ s: 0, k: i, color: T['--spike'], shape: 'tri' }));
+  }
+  lineChart(cv, 190, { series: [{ data: r, color: T['--rtp'], width: 2, end: n > 0 }], yMax, refs, markers, minX: 10,
+                       empty: n ? null : '還沒有飛行紀錄' });
+}
+
+// ---------------- bulk simulation ----------------
+let bulk = null, bulkRunning = false, bulkDone = false, sampleIdx = -1;
+function readBulkCfg() {
+  const ci = (id, lo, hi, d) => { const v = Math.floor(Number($(id).value)); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
+  let fixedX = Number($('#bFixed').value);
+  fixedX = isFinite(fixedX) ? Math.min(CAP, Math.max(1.01, Math.round(fixedX * 100) / 100)) : 2;
+  return { sessions: ci('#bSessions', 100, 50000, 2000), rounds: ci('#bRounds', 10, 5000, 100), model: $('#bModel').value, fixedX,
+           seed: ci('#bSeed', 0, 2147483647, 42) };
+}
+function runBulk() {
+  const cfg = readBulkCfg();
+  bulk = E.createBulk(cfg); bulkRunning = true; bulkDone = false;
+  const btn = $('#bRun'); btn.disabled = true; btn.textContent = '模擬中…';
+  $('#bProg').hidden = false; $('#bProg span').style.width = '0%';
+  const tick = () => {
+    const done = bulk.step(26);
+    $('#bProg span').style.width = (100 * bulk.done / cfg.sessions).toFixed(1) + '%';
+    if (!done) { setTimeout(tick, 0); return; }
+    bulkRunning = false; bulkDone = true; sampleIdx = bulk.sampleIdx;
+    btn.disabled = false; btn.textContent = '重新模擬'; $('#bProg').hidden = true;
+    renderBulk();
+  };
+  setTimeout(tick, 0);
+}
+function bulkStats(k) {
+  const r = bulk.result[k];
+  return { rtp: r.G / r.P, mean: r.sumRtp / r.sessions, over: r.endOver12 / r.sessions, killed: r.killedSessions / r.sessions,
+           sup: r.suppress / r.sessions, low: r.low105 / r.rounds, pUp: 1 - (r.powerstat[1] || 0) / r.rounds };
+}
+function renderBulk() {
+  if (!bulk || !bulkDone) return;
+  const cfg = bulk.cfg, a = bulkStats('off'), b = bulkStats('on');
+  const d = (b.rtp - a.rtp) * 100;
+  const model = { coupled: '原碼機器人', fixedDist: '目標 1/V 機器人', fixed: `固定 ${fmtX(cfg.fixedX)} 收手` }[cfg.model];
+  $('#bVerdict').innerHTML = `${model}、${fmtInt(cfg.sessions)} 場 × ${fmtInt(cfg.rounds)} 局，同一組亂數：殺率控制把 RTP 從 <b>${pct(a.rtp, 2)}</b> 壓到 <b>${pct(b.rtp, 2)}</b>（${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(2)} 個百分點），${pct(b.killed, 0)} 的場次至少被強制爆一次。`;
+  $('#bMeta').textContent = `seed ${cfg.seed}`;
+  const dp = x => (x >= 0 ? '+' : '−') + Math.abs(x * 100).toFixed(2) + ' pp';
+  const rows = [
+    ['總 RTP（Σ返還 ÷ Σ下注）', pct(a.rtp, 2), pct(b.rtp, 2), dp(b.rtp - a.rtp)],
+    ['平均每場 RTP', pct(a.mean, 2), pct(b.mean, 2), dp(b.mean - a.mean)],
+    ['結束時 RTP > 120% 的場次', pct(a.over), pct(b.over), dp(b.over - a.over)],
+    ['被強制爆過的場次', pct(a.killed), pct(b.killed), ''],
+    ['每場強制爆次數', a.sup.toFixed(2), b.sup.toFixed(2), ''],
+    ['爆點 ≤ 1.05× 的局', pct(a.low, 2), pct(b.low, 2), dp(b.low - a.low)],
+    ['p > 1 的局', pct(a.pUp, 2), pct(b.pUp, 2), '']
+  ];
+  $('#bTable').innerHTML = '<thead><tr><th>指標</th><th>無殺率</th><th>有殺率</th><th>差</th></tr></thead><tbody>' +
+    rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="d">${r[3]}</td></tr>`).join('') + '</tbody>';
+  renderBulkCharts();
+}
+function renderBulkCharts() {
+  if (!bulk || !bulkDone || currentView !== 'bulk') return;
+  // histogram of final session RTP (0.1 buckets, last bucket = 3.0+)
+  const NB = 31, hist = k => { const v = new Array(NB).fill(0), r = bulk.result[k];
+    for (const [key, cnt] of Object.entries(r.stat)) { const b = Math.min(NB - 1, Math.max(0, Math.round(parseFloat(key) * 10))); v[b] += cnt; }
+    return v.map(x => 100 * x / r.sessions); };
+  const ho = hist('off'), hn = hist('on');
+  const hMax = Math.max(...ho, ...hn), hStep = niceStep(hMax, 4), hTop = Math.ceil(hMax / hStep) * hStep || 1;
+  const hT = []; for (let v = 0; v <= hTop + 1e-9; v += hStep) hT.push(v);
+  barChart($('#bHist'), 210, { cats: NB, groups: [{ vals: ho, color: T['--rtp'] }, { vals: hn, color: T['--accent'] }],
+    yMax: hTop, yTicks: hT, yFmt: v => (Math.round(v * 10) / 10) + '%',
+    labelAt: c => c % 5 === 0 ? (c === 30 ? '3.0+' : (c / 10).toFixed(1)) : null, vline: 12 });
+  // power distribution (ON), log10 counts like the original
+  const ps = bulk.result.on.powerstat, pc = [];
+  for (let k = 0; k <= 15; k++) { const key = Math.round((1 + k / 10) * 10) / 10; pc.push(ps[key] ? Math.log10(ps[key]) : 0); }
+  const pTop = Math.max(1, Math.ceil(Math.max(...pc)));
+  const pT = []; for (let v = 0; v <= pTop; v++) pT.push(v);
+  barChart($('#bPower'), 190, { cats: 16, groups: [{ vals: pc, color: T['--kill'] }], yMax: pTop, yTicks: pT, yFmt: v => '10^' + v,
+    labelAt: c => c % 5 === 0 ? (1 + c / 10).toFixed(1) : null });
+  drawSample();
+}
+function drawSample() {
+  const cv = $('#bSample'), lbl = $('#bSampleLbl');
+  if (sampleIdx < 0) {
+    lbl.textContent = '沒有被強制爆的場次';
+    lineChart(cv, 210, { series: [{ data: [0], color: T['--rtp'] }], yMax: 1.5, minX: 10, empty: '這次模擬沒有任何強制爆' });
+    $('#bPrev').disabled = $('#bNext').disabled = true;
+    return;
+  }
+  const pair = bulk.sample(sampleIdx);
+  lbl.textContent = `第 ${fmtInt(sampleIdx + 1)} 場`;
+  $('#bPrev').disabled = bulk.nextKilled(sampleIdx, -1) < 0;
+  $('#bNext').disabled = bulk.nextKilled(sampleIdx, 1) < 0;
+  const off = pair.off.rtph, on = pair.on.rtph;
+  let yMax = 1.5;
+  for (let k = 3; k < off.length; k++) yMax = Math.max(yMax, off[k] * 1.08, on[k] * 1.08);
+  yMax = Math.min(Math.ceil(yMax * 4) / 4, 4);
+  const markers = [];
+  pair.on.oboom.forEach(i => markers.push({ s: 1, k: i, color: T['--kill'] }));
+  pair.on.capture.forEach(i => markers.push({ s: 1, k: i, color: T['--spike'], shape: 'tri' }));
+  lineChart(cv, 210, { series: [{ data: off, color: T['--rtp'], width: 1.6 }, { data: on, color: T['--accent'], width: 2 }], yMax,
+    refs: [{ y: 1, color: T['--base'], width: 1.3 }, { y: E.HOT, color: T['--kill'], dash: [5, 4] }], markers, minX: 10 });
+}
+
+// ---------------- rules table ----------------
+function renderPTable() {
+  const ps = [1, 1.5, 2, 2.5], xs = [1.5, 2, 5, 10];
+  $('#pTable').innerHTML = '<thead><tr><th>收手倍數</th>' + ps.map(p => `<th>p = ${p.toFixed(1)}</th>`).join('') + '</tr></thead><tbody>' +
+    xs.map(x => `<tr><td>${fmtX(x)}</td>` + ps.map(p => `<td>${pct(Math.pow(x, 1 - p))}</td>`).join('') + '</tr>').join('') + '</tbody>';
+}
+
+// ---------------- misc UI ----------------
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+}
+function syncCash() {
+  const on = $('#autoOn').checked, t = readAutoT();
+  $('#autoT').disabled = !on;
+  $('#cashHint').textContent = on && t ? `到 ${fmtX(t)} 自動收手；p = 1 時成功率約 ${pct(1 / (t - 0.005))}` : '不勾就自己按「收手」';
+}
+function setMode(k) {
+  if (k === modeKey || G.phase === 'flying' || G.auto.on) return;
+  modeKey = k; G.r = null; G.phase = 'idle';
+  fx.parts.length = 0; fx.chutes.length = 0; fx.flash = null; fx.ring = null;
+  lastPaint = '';
+  renderAll();
+}
+let currentView = 'play';
+function showView() {
+  const h = (location.hash || '').replace('#', '');
+  currentView = ['play', 'bulk', 'rules'].includes(h) ? h : 'play';
+  for (const v of ['play', 'bulk', 'rules']) $('#view-' + v).hidden = v !== currentView;
+  $$('.views a').forEach(a => a.setAttribute('aria-current', a.dataset.view === currentView ? 'page' : 'false'));
+  if (currentView === 'play') { sizeSky(); drawRtpChart(); }
+  if (currentView === 'bulk') { if (!bulk) runBulk(); else renderBulkCharts(); }
+}
+
+function bind() {
+  $$('.pad').forEach(p => p.addEventListener('click', () => setMode(p.dataset.mode)));
+  $('#goBtn').addEventListener('click', () => {
+    if (G.phase === 'flying') { manualCashOut(); return; }
+    if (!G.auto.on) startRound(false);
+  });
+  $('#skipBtn').addEventListener('click', () => { if (G.phase === 'flying' && G.r && G.r.cashedAt != null) G.skip = true; });
+  const setBet = v => { $('#bet').value = Math.max(1, Math.floor(v)); renderGo(); renderKpis(); };
+  $('#betMinus').addEventListener('click', () => { const v = readBet() || 10; setBet(v - (v > 100 ? 10 : v > 20 ? 5 : 1)); });
+  $('#betPlus').addEventListener('click', () => { const v = readBet() || 10; setBet(v + (v >= 100 ? 10 : v >= 20 ? 5 : 1)); });
+  $$('#chips button').forEach(b => b.addEventListener('click', () => {
+    const v = readBet() || 10, c = b.dataset.chip, bal = Math.max(1, Math.floor(cur().balance));
+    setBet(c === 'half' ? v / 2 : c === 'double' ? Math.min(v * 2, bal) : Number(c));
+  }));
+  $('#bet').addEventListener('input', () => { renderGo(); renderKpis(); });
+  $('#autoOn').addEventListener('change', syncCash);
+  $('#autoT').addEventListener('input', syncCash);
+  $('#autoT').addEventListener('change', () => { const t = readAutoT(); if (t) $('#autoT').value = t.toFixed(2); syncCash(); });
+  $$('#speedSeg button').forEach(b => b.addEventListener('click', () => { setSpeed(Number(b.dataset.speed)); lockUi(); }));
+  $('#autoBtn').addEventListener('click', () => { if (G.auto.on) stopAuto(); else startAuto(); });
+  $('#houseOn').addEventListener('change', e => { houseOn = e.target.checked; lastPaint = ''; renderAll(); });
+  $('#refillBtn').addEventListener('click', () => { const s = cur(); s.balance += START; s.refills++; renderKpis(); });
+  let armed = 0;
+  $('#resetBtn').addEventListener('click', e => {
+    const btn = e.currentTarget;
+    if (G.phase === 'flying' || G.auto.on) return;
+    if (Date.now() - armed < 3000) {
+      armed = 0; S[modeKey] = makeSession(modeKey); G.r = null; G.phase = 'idle'; lastPaint = '';
+      btn.textContent = '重置這個 session'; btn.classList.remove('warn');
+      renderAll(); toast(LABEL[modeKey] + ' session 已重置');
+    } else {
+      armed = Date.now(); btn.textContent = '再按一次確認'; btn.classList.add('warn');
+      setTimeout(() => { if (armed && Date.now() - armed >= 2900) { armed = 0; btn.textContent = '重置這個 session'; btn.classList.remove('warn'); } }, 3000);
+    }
+  });
+  $('#blindBox').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    const s = S.blind;
+    if (b.dataset.guess) { s.guess = b.dataset.guess === 'on'; s.revealed = true; lastPaint = ''; renderAll(); }
+    else if (b.dataset.newblind) { S.blind = makeSession('blind'); G.r = null; G.phase = 'idle'; lastPaint = ''; renderAll(); toast('新的盲測 session 已開始'); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space' || e.repeat || currentView !== 'play') return;
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
+    e.preventDefault();
+    if (G.phase === 'flying') manualCashOut(); else if (!G.auto.on) startRound(false);
+  });
+  $('#bulkForm').addEventListener('submit', e => { e.preventDefault(); if (!bulkRunning) runBulk(); });
+  $('#bModel').addEventListener('change', () => { $('#bFixedWrap').hidden = $('#bModel').value !== 'fixed'; });
+  $('#bPrev').addEventListener('click', () => { const k = bulk && bulk.nextKilled(sampleIdx, -1); if (k >= 0) { sampleIdx = k; drawSample(); } });
+  $('#bNext').addEventListener('click', () => { const k = bulk && bulk.nextKilled(sampleIdx, 1); if (k >= 0) { sampleIdx = k; drawSample(); } });
+  window.addEventListener('hashchange', showView);
+  const redrawAll = () => { readTokens(); drawRtpChart(); renderBulkCharts(); };
+  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+  new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(() => sizeSky()).observe($('#skyBox'));
+    let lastW = 0;
+    new ResizeObserver(entries => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (w === lastW) return; lastW = w;
+      drawRtpChart(); renderBulkCharts();
+    }).observe($('.wrap'));
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+}
+
+// ---------------- hot-update snapshot ----------------
+function snapshot() {
+  const r = G.r;
+  return { v: 1, S, modeKey, houseOn, speed: G.speed, bet: $('#bet').value, autoOn: $('#autoOn').checked, autoT: $('#autoT').value,
+           inflight: G.phase === 'flying' && r ? { key: r.s.key, bet: r.bet, crash: r.crash, capped: r.capped, cashedAt: r.cashedAt, info: r.info, n: r.n } : null };
+}
+function restore(d) {
+  if (!d || d.v !== 1 || !d.S || !d.S.off || !d.S.on || !d.S.blind) return;
+  S = d.S; modeKey = S[d.modeKey] ? d.modeKey : 'off'; houseOn = !!d.houseOn;
+  $('#houseOn').checked = houseOn;
+  if (d.bet) $('#bet').value = d.bet;
+  $('#autoOn').checked = !!d.autoOn; if (d.autoT) $('#autoT').value = d.autoT;
+  if (d.inflight) { // settle a flight interrupted by the update: kept if already cashed, lost otherwise
+    const f = d.inflight, s = S[f.key], i = f.info;
+    const payout = E.settle(s.st, f.bet, f.cashedAt, f.crash);
+    s.sumBet += f.bet; s.sumPay += payout; if (f.cashedAt != null) s.wins++;
+    s.rec.push({ n: f.n, bet: f.bet, crash: f.crash, capped: f.capped, cashedAt: f.cashedAt, payout, rtp: lastOf(s.st.rtph),
+      rtpB: i.rtpBefore, hot: i.hot, dur: i.duration, spike: i.spike, bar: i.bar, checked: i.checked, roll: i.killRoll,
+      forced: i.forced, natural: i.natural, pB: i.powerBefore, pA: i.powerAfter });
+  }
+  if (typeof d.speed === 'number') setSpeed(d.speed);
+}
+
+function start(data) {
+  try { restore(data); } catch (err) { /* start fresh */ }
+  readTokens();
+  bind();
+  syncCash();
+  renderPTable();
+  showView();
+  sizeSky();
+  renderAll();
+  requestAnimationFrame(frame);
+  window.__crash = { get S() { return S; }, G, E, setMode, setSpeed, startAuto, stopAuto };
+}
+if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 'function') window.claude.hot.snapshot(snapshot);
+if (window.claude && window.claude.hot && typeof window.claude.hot.ready === 'function') window.claude.hot.ready(start);
+else start((window.claude && window.claude.hot && window.claude.hot.data) || {});
+})();
+</script>
