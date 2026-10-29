@@ -17,14 +17,23 @@
 
 ## 遊戲數學
 
-爆點：
+**試玩版（已修正）**：無條件捨去 + 2% 抽成。
+
+```
+odds = max(1.00, floor(100 · (1−h) / U^(1/p)) / 100)      h = 2%
+P(爆點 ≥ x) = (1−h) · x^(−p)
+```
+
+p = 1 時，不管在哪個倍數收手，期望 RTP 都是 98%（`node analysis/floor_check.js`）。
+
+**原碼（批量模擬仍保留）**：
 
 ```
 odds = round(1 / U^(1/p), 2)      U ~ Uniform(0, 1)
 P(爆點 ≥ x) = x^(−p)
 ```
 
-p = 1 時，任何「在 x 倍收手」的策略期望 RTP 都是 x × 1/x = 100%。
+原碼的四捨五入讓每個固定收手點的 RTP 都大於 100%，這是下面「發現」第 1 點，也是試玩版改用 floor 的原因：在 1.5× 平注 100、有殺率開著，連玩 317,686 局淨賺 +98,882，和 +0.33%／局的期望值吻合。
 
 殺率控制器只在有殺率時動作，看的是「到上一局為止的本 session 累計 RTP」：
 
@@ -82,10 +91,11 @@ node verify/test_engine.js verify/tape_on.json verify/tape_off.json
 | `build.py` | 把 `src/` 組成 `index.html` |
 | `original/crashsimulation.py` | 原始 Python 模擬 |
 | `verify/` | 與原碼對拍的腳本 |
-| `analysis/` | 大樣本、平注策略與破產機率的模擬 |
+| `analysis/` | 大樣本、平注策略、破產機率，以及 `floor_check.js`（floor + 抽成後各收手點的 RTP） |
 
 ## 試玩版和原碼的差異
 
+- **爆點公式**：試玩版用 floor + 2% 抽成；批量模擬用原碼的 round。引擎的 `newSession({mode:'round'|'floor', edge})` 可切換，對拍測試走 round。
 - 收手點由玩家決定；原碼的 1/V^(1/p) 機器人只用在批量模擬。
 - 每個試玩 session 從 p = 1 開始；原碼的 p 會延續到下一個 cycle，批量模擬保留這個行為。
 - 到 360× 自動收手；原碼是「目標 ≥ 360 時賠 360」，只有目標超過 360 且爆點落在兩者之間時結果不同。

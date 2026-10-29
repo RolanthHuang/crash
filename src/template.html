@@ -374,15 +374,16 @@ td .sp{color:var(--spike);font-weight:700}
       <h3>怎麼玩</h3>
       <p>下注後火箭起飛，倍數照 <code>m(t) = e^(0.16t)</code> 往上爬：1× 速度下約 4.3 秒到 2×、14 秒到 10×、29 秒到 100×。爆炸前按「收手」拿回「注額 × 當下倍數」；來不及就整注沒收。到 360× 自動收手，對應原碼的賠付上限。</p>
       <h3>爆點怎麼抽</h3>
-<pre>odds = round(1 / U^(1/p), 2)        U ~ Uniform(0, 1)
-P(爆點 ≥ x) = x^(−p)</pre>
-      <p>p = 1 時，任何「在 x 倍收手」的策略期望 RTP 都是 x × 1/x = 100%。原碼用四捨五入而不是無條件捨去，等於每個爆點多送 0.005，所以無殺率版其實略高於 100%：固定在 2× 收手是 2 ÷ 1.995 ≈ 100.25%。換句話說，這個遊戲的莊家優勢全部來自殺率控制。</p>
+<pre>試玩版：odds = max(1.00, floor(100 · (1−h) / U^(1/p)) / 100)    h = 2%
+P(爆點 ≥ x) = (1−h) · x^(−p)
+原碼：odds = round(1 / U^(1/p), 2)</pre>
+      <p>試玩版用無條件捨去加 2% 抽成：p = 1 時，不管在哪個倍數收手，期望 RTP 都是 98%，固定策略、平注、低倍收手都無法長期獲利。原碼用四捨五入，等於每個爆點多送 0.005，固定在 x 倍收手的 RTP 是 x ÷ (x − 0.005)，永遠大於 100%（1.5× 約 100.33%），平注玩久了會無限賺。這是原碼的漏洞，所以試玩版改了；批量模擬仍保留原碼公式，方便對照。</p>
       <h3>殺率控制器（只在有殺率時動作）</h3>
 <pre>下注後先抽爆點，再看「到上一局為止的本 session 累計 RTP」：
   RTP &gt; 120%:
       duration += 1
       若 duration &gt; 5 或 本局注額 &gt; 2 × 典型注額:
-          30% 機率 → 爆點改成 round(Uniform(1, 1.05), 2)
+          30% 機率 → 爆點改成 Uniform(1, 1.05)（取到小數兩位）
                       p += 0.1（上限 2.5）
   RTP ≤ 120%:
       duration = 0，p = 1</pre>
@@ -426,6 +427,7 @@ const E = window.CrashEngine;
 const GROWTH = 0.16;            // m(t) = e^(0.16 t)
 const CAP = E.CAP;
 const START = 1000;
+const HOUSE_EDGE = 0.02;   // 試玩 session: floor 取整 + 2% 抽成 (RTP 98%)
 const MONO = '"Martian Mono", ui-monospace, Menlo, Consolas, monospace';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -445,7 +447,7 @@ const lastOf = a => a[a.length - 1];
 // ---------------- sessions ----------------
 function makeSession(key) {
   const killOn = key === 'blind' ? LIVE.uniform() < 0.5 : key === 'on';
-  return { key, killOn, st: E.newSession({ killOn, captureAlways: true }), balance: START, refills: 0,
+  return { key, killOn, st: E.newSession({ killOn, captureAlways: true, mode: 'floor', edge: HOUSE_EDGE }), balance: START, refills: 0,
            rec: [], wins: 0, sumBet: 0, sumPay: 0, revealed: key !== 'blind', guess: null };
 }
 let S = { off: makeSession('off'), on: makeSession('on'), blind: makeSession('blind') };
@@ -1208,7 +1210,7 @@ function toast(msg) {
 function syncCash() {
   const on = $('#autoOn').checked, t = readAutoT();
   $('#autoT').disabled = !on;
-  $('#cashHint').textContent = on && t ? `到 ${fmtX(t)} 自動收手；p = 1 時成功率約 ${pct(1 / (t - 0.005))}` : '不勾就自己按「收手」';
+  $('#cashHint').textContent = on && t ? `到 ${fmtX(t)} 自動收手；p = 1 時成功率約 ${pct((1 - HOUSE_EDGE) / t)}` : '不勾就自己按「收手」';
 }
 function setMode(k) {
   if (k === modeKey || G.phase === 'flying' || G.auto.on) return;

@@ -60,9 +60,17 @@
     return mean(lower);
   }
 
+  // Crash point from a uniform roll. 'round' = the original (round to 2 dp, gives players +x/(x-0.005));
+  // 'floor' = truncate and take house edge h, so P(crash >= x) = (1-h)/x^p and RTP = 1-h at every cash-out.
+  function crashFrom(roll, power, mode, edge) {
+    if (mode === 'floor') return Math.max(1, Math.floor(100 * (1 - edge) / Math.pow(roll, 1 / power) + 1e-9) / 100);
+    return pyRound(1 / Math.pow(roll, 1 / power), 2);
+  }
+
   function newSession(o) {
     o = o || {};
     return {
+      mode: o.mode === 'floor' ? 'floor' : 'round', edge: o.edge == null ? 0 : o.edge,
       killOn: !!o.killOn, power: o.power == null ? 1 : o.power, duration: 0,
       past: [], placed: 0, gained: 0, rtph: [0],
       capture: [], oboom: [], suppress: 0,
@@ -79,7 +87,7 @@
     var rtpBefore = st.rtph[st.rtph.length - 1];
     var powerBefore = st.power;
     var roll = R.roll.uniform(0, 1);
-    var natural = pyRound(1 / Math.pow(roll, 1 / st.power), 2);
+    var natural = crashFrom(roll, st.power, st.mode, st.edge);
     var odds = natural;
     var extra = afterRoll ? afterRoll(st) : null;
 
@@ -105,7 +113,7 @@
         checked = true;
         killRoll = R.kill.uniform();
         if (killRoll < KILL_P) {
-          odds = pyRound(R.kill.uniform(1, 1.05), 2);
+          odds = st.mode === 'floor' ? Math.floor(R.kill.uniform(1, 1.05) * 100) / 100 : pyRound(R.kill.uniform(1, 1.05), 2);
           st.oboom.push(i);
           if (st.power < POWER_MAX) st.power += 0.1;
           st.suppress += 1;
@@ -234,7 +242,7 @@
                player: makeRng(seedFor(seed, idx, 3)), kill: makeRng(seedFor(seed, idx, 4)) };
     }
     function runOne(md, idx, power, record, captureAlways) {
-      var st = newSession({ killOn: md.killOn, power: power, captureAlways: captureAlways });
+      var st = newSession({ killOn: md.killOn, power: power, captureAlways: captureAlways, mode: cfg.mode, edge: cfg.edge });
       var R = streams(idx), A = res[md.key], k, out, pk;
       st.crashes = [];
       for (k = 0; k < rounds; k++) {
@@ -296,7 +304,7 @@
   var api = {
     PRO: PRO, BOOM: BOOM, CAP: CAP, HOT: HOT, DUR_LIMIT: DUR_LIMIT, KILL_P: KILL_P,
     BOUNCE: BOUNCE, POWER_MAX: POWER_MAX,
-    pyRound: pyRound, targetFunction: targetFunction, newSession: newSession,
+    pyRound: pyRound, crashFrom: crashFrom, targetFunction: targetFunction, newSession: newSession,
     beginRound: beginRound, settle: settle, botRound: botRound,
     tapeRng: tapeRng, makeRng: makeRng, seedFor: seedFor, cryptoRng: cryptoRng, createBulk: createBulk
   };
